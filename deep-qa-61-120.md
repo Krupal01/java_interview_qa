@@ -1865,3 +1865,274 @@ Main application stores token + masked display value only
 ---
 
 
+
+## Question 102 — Serialization (`transient`, `serialVersionUID`, Non-Serializable Superclass)
+
+**Code:**
+```java
+class Address { String city; }
+class Person implements Serializable {
+    String name;
+    transient Address address;
+}
+```
+
+**Ask:**
+1. What does `transient` actually do during serialization, and what value does that field get on the deserializing side?
+2. What is `serialVersionUID` for, and what breaks if you omit it and later change the class?
+3. Trap: if a superclass doesn't implement `Serializable` but a subclass does, what actually gets serialized, and what must the superclass have for deserialization to work at all?
+
+### Answer
+
+**Part 1 — what `transient` actually does:**
+- `transient` excludes a field from the serialized byte stream **entirely** — it's not "skipped and restored later," it's never written out at all.
+- On deserialization, that field gets its **default value** for its type — `null` for objects, `0`/`0.0`/`false` for primitives — not whatever value it held before serialization, and not recomputed from anything, unless custom `readObject()` logic reconstructs it manually.
+- So a deserialized `Person` above always has `address == null`, regardless of what it was set to before serialization.
+
+**Part 2 — `serialVersionUID`, and what breaks without it:**
+- `serialVersionUID` is a version identifier that `ObjectOutputStream`/`ObjectInputStream` compare during deserialization to confirm the class definition on disk matches the class definition currently loaded in the JVM.
+- If omitted, the JVM **auto-generates one** from the class's structure (fields, methods, modifiers). Any structural change — adding a field, changing a method signature, even recompiling with a different javac version — can silently change this computed value.
+- **What breaks:** deserializing old data against the new class throws `InvalidClassException` at runtime, even for logically backward-compatible changes (like adding a new optional field).
+- Explicitly declaring `private static final long serialVersionUID = 1L;` gives control over exactly when compatibility is considered broken, instead of leaving it to an implicit, fragile auto-computation.
+
+**Part 3 — the non-serializable superclass trap:**
+- Only the **subclass's own fields** get serialized — none of the superclass's fields are written to the stream at all.
+- On deserialization, Java reconstructs the object by calling the **superclass's no-arg constructor** directly (not by restoring superclass field values from the stream, since none exist there).
+- This means the superclass **must have a no-arg constructor**, or deserialization throws `InvalidClassException` at runtime.
+- Any superclass state ends up whatever that no-arg constructor sets it to — it is not preserved across the serialize/deserialize round trip, a common source of subtle bugs when a non-serializable base class is added to an existing serializable hierarchy without realizing this.
+
+**⚠️ Keywords to nail:** `transient` fields are **never written**, and come back as the type's default value (`null`/`0`/`false`) on deserialization, not their original value; `serialVersionUID` omitted → JVM auto-computes from class structure → any structural change can silently break deserialization with `InvalidClassException`; non-`Serializable` superclass → **only subclass fields serialize**, superclass state is rebuilt via its **no-arg constructor** (which must exist) rather than restored from the stream.
+
+---
+
+## Question 103 — Cloning (Shallow vs. Deep, `Cloneable` Design Flaws)
+
+**Code:**
+```java
+class Address { String city; }
+class Person implements Cloneable {
+    String name;
+    Address address;
+    public Person clone() throws CloneNotSupportedException {
+        return (Person) super.clone();
+    }
+}
+```
+
+**Ask:**
+1. `super.clone()` here performs a shallow clone — explain exactly what that means for the `address` field.
+2. Give the concrete bug this causes if the caller mutates the clone's `address.city`.
+3. How do you fix it to get a true deep clone, and name one alternative to overriding `clone()` entirely — with a reason to prefer it.
+
+### Answer
+
+**Part 1 — what shallow cloning via `super.clone()` actually does:**
+- `Object.clone()` performs a **field-by-field bitwise copy**: primitives are duplicated by value, but reference fields (`address`) are copied as **references**, not as new objects.
+- Result: the cloned `Person` and the original `Person` end up with two independent `name` references (fine, since `String` is immutable) but the exact **same** `Address` object reference — both point at one shared `Address` instance.
+
+**Part 2 — the concrete bug:**
+- `clonedPerson.address.city = "NYC";` also changes `originalPerson.address.city`, because both objects' `address` field points at the identical `Address` instance in memory.
+- Mutating through one reference is visible through the other — which almost never matches what a caller expects "clone" to mean.
+
+**Part 3 — the deep-clone fix, and the preferred alternative:**
+- Fix: inside `clone()`, after calling `super.clone()`, explicitly clone the mutable fields too — e.g., `cloned.address = new Address(this.address.city);`, or call `address.clone()` if `Address` properly implements `Cloneable` itself. Every level of nested mutable state needs its own explicit clone, recursively, if the object graph is deeper than one level.
+- **Preferred alternative: a copy constructor** — `Person(Person other) { this.name = other.name; this.address = new Address(other.address.city); }` (or a static factory/builder that manually builds a new deep copy).
+- **Why prefer it:** Java's `Cloneable`/`clone()` protocol is widely regarded as a design mistake — no constructor is actually invoked, `clone()` awkwardly throws a checked exception, and only arrays clone "correctly" by default with no extra work. A copy constructor is explicit, type-safe, doesn't rely on the fragile `super.clone()` contract, and makes deep-vs-shallow an obvious decision made in one visible place instead of hidden inside an overridden `clone()`.
+
+**⚠️ Keywords to nail:** `super.clone()` copies reference fields **by reference**, not by value — shallow; the bug is that mutating the clone's nested object also mutates the original's, since both point to the same instance; the deep-clone fix requires explicitly re-cloning every mutable field yourself; `Cloneable`/`clone()` is considered a Java design flaw (no constructor runs, checked exception, only arrays "just work") — a **copy constructor** is the standard preferred alternative.
+
+---
+
+## Question 104 — Annotations + Reflection (Retention Policy, Meta-Annotations)
+
+**Code:**
+```java
+@interface MyAnnotation {
+    String value();
+}
+```
+
+**Ask:**
+1. This custom annotation, as written, is **not accessible via reflection at runtime**. What's missing, and why does the default behavior make it invisible?
+2. Name the 4 meta-annotations and what each configures.
+3. Trap: even after fixing retention, `method.getAnnotation(MyAnnotation.class)` returns `null`. What's the second most common cause, beyond retention, for this?
+
+### Answer
+
+**Part 1 — the missing piece and why the default hides it:**
+- Missing: `@Retention(RetentionPolicy.RUNTIME)`.
+- Without an explicit `@Retention`, the default is `RetentionPolicy.CLASS` — the annotation is written into the `.class` file's bytecode (visible to bytecode-level tools) but is **discarded by the JVM at class-load time**, never available via reflection at runtime.
+- There's also `RetentionPolicy.SOURCE` (discarded by the compiler, never even reaches bytecode — e.g., `@Override`). Only `RUNTIME` keeps the annotation queryable via `getAnnotation()`.
+
+**Part 2 — the 4 meta-annotations:**
+- `@Retention` — how long the annotation survives (`SOURCE` / `CLASS` / `RUNTIME`).
+- `@Target` — which program elements it may be applied to (`ElementType.METHOD`, `TYPE`, `FIELD`, etc.); applying it anywhere else is a compile error.
+- `@Documented` — includes it in generated Javadoc output.
+- `@Inherited` — makes a **class-level** annotation apply transitively to subclasses of an annotated class (does not extend to method/field-level annotations).
+
+**Part 3 — the second most common cause of a null result:**
+- Looking it up on the **wrong reflective element** — e.g., the annotation is on a method declared in an **interface**, and the lookup is done on the **implementing class's overriding method** instead. Method-level annotations do not automatically carry across an interface-to-implementation boundary the way `@Inherited` handles class-to-subclass.
+- Another frequent variant: the annotation is placed on a **method**, but the code calls `clazz.getAnnotation(...)` (a class-level lookup) instead of `method.getAnnotation(...)`.
+
+**⚠️ Keywords to nail:** default retention without `@Retention` is `CLASS` (bytecode-visible, JVM-invisible at runtime) — must explicitly use `RUNTIME` for `getAnnotation()` to work; the 4 meta-annotations are `@Retention`, `@Target`, `@Documented`, `@Inherited`; `@Inherited` only propagates **class-level** annotations to subclasses, never method/field-level ones; a common null-result cause beyond retention is querying the wrong element (interface method vs implementing class's override, or class-level lookup instead of method-level).
+
+---
+
+## Question 105 — JDBC (`PreparedStatement` vs. `Statement`, SQL Injection Mechanics)
+
+**Code:**
+```java
+String query = "SELECT * FROM users WHERE username = '" + userInput + "'";
+Statement stmt = conn.createStatement();
+ResultSet rs = stmt.executeQuery(query);
+```
+
+**Ask:**
+1. Give an exact SQL injection payload a user could type as `userInput` to bypass a login check here, and explain why it works at the parsing level.
+2. Why does switching to `PreparedStatement` with a `?` placeholder actually fix this — what does the driver do differently, not just "it's safer"?
+3. Trap: does `PreparedStatement` alone make an application fully immune to SQL injection? Name one scenario where it doesn't.
+
+### Answer
+
+**Part 1 — the exact payload and why it works:**
+- `userInput = "' OR '1'='1"` turns the query into `SELECT * FROM users WHERE username = '' OR '1'='1'`.
+- `OR '1'='1'` is always true, so the `WHERE` clause filters nothing, and the query returns **every row** in the table — defeating a login check that just checks "did any row come back."
+- **Why it works:** string concatenation lets attacker-supplied text become part of the **SQL grammar itself**, not just data. The database's parser has no way to distinguish "data the attacker typed" from "SQL syntax the attacker typed" once they're concatenated into the same string.
+
+**Part 2 — the actual mechanism `PreparedStatement` changes:**
+- The query structure — with `?` placeholders as fixed slots — is sent to and **compiled by the database first**. Parameter values are then sent **separately**, bound to those slots purely as data.
+- The driver never re-parses the SQL grammar after binding parameters, so a value like `' OR '1'='1` is treated as a **literal string** to search for in the `username` column (which simply won't match anything), never as SQL syntax.
+- The parser boundary between code and data is enforced by the wire protocol itself — not by escaping special characters, which is why `PreparedStatement` closes off this entire class of attack rather than just this one payload.
+
+**Part 3 — the trap: `PreparedStatement` is not blanket immunity:**
+- It only protects **parameter values** bound through `?` placeholders.
+- It does nothing if attacker-controlled input is still concatenated into parts of the query that aren't parameterizable — most notably **table names, column names, or `ORDER BY` direction/column** (`ORDER BY ?` isn't valid JDBC syntax for a dynamic column name, so developers commonly fall back to string concatenation there), which reopens the exact same injection risk in that specific clause.
+
+**⚠️ Keywords to nail:** the classic payload is `' OR '1'='1` — always-true clause defeats the filter; string concatenation lets attacker input become **SQL grammar**, not just data; `PreparedStatement` fixes this because the query is compiled **before** parameters are bound, so bound values are never re-parsed as SQL; `PreparedStatement` is not total immunity — dynamic table/column names and `ORDER BY` clauses (not parameterizable via `?`) are a common residual injection surface.
+
+---
+
+## Question 106 — `Optional` (Idiomatic Usage vs. Anti-Patterns)
+
+**Code:**
+```java
+Optional<String> name = Optional.ofNullable(getName());
+if (name.isPresent()) {
+    System.out.println(name.get());
+}
+```
+
+**Ask:**
+1. This is a common anti-pattern — what's wrong with it idiomatically (not a bug), and what's the one-line idiomatic replacement?
+2. Trap: `Optional.of(null)` vs. `Optional.ofNullable(null)` — what happens with each, exactly?
+3. Should a method parameter ever be typed as `Optional<T>`? Should a JPA entity field be `Optional<T>`? Give the actual reasoning, not just "it's discouraged."
+
+### Answer
+
+**Part 1 — the anti-pattern and its fix:**
+- `isPresent()` + `get()` is functionally just `if (name != null) print(name)` rewritten with extra ceremony — it never actually uses any of `Optional`'s real value (composability, forcing explicit handling of absence at the type level).
+- Idiomatic replacement: `name.ifPresent(System.out::println);` — expresses "do this only if present" as a single expression using `Optional`'s own API, instead of manually branching on its internal presence flag.
+
+**Part 2 — `of(null)` vs. `ofNullable(null)`:**
+- `Optional.of(null)` throws `NullPointerException` **immediately**, at the point of wrapping — `of()` explicitly asserts the value is non-null and fails fast if that assertion is violated.
+- `Optional.ofNullable(null)` returns `Optional.empty()` safely, no exception — designed specifically for values that legitimately might be null.
+
+**Part 3 — parameters and entity fields:**
+- Method parameters **should not** be `Optional<T>` — it forces every caller to wrap their argument in an `Optional` just to make the call, adding ceremony with no benefit; plain overloading or a `@Nullable` annotation communicates optionality better for inputs.
+- JPA entity fields **should not** be `Optional<T>` either — `Optional` isn't `Serializable`, and JPA/Hibernate doesn't natively map an `Optional<T>` field to a column as its stored type (limited support exists on some getters, but not as the actual persisted field type).
+- The underlying reasoning: `Optional` was explicitly designed by its creators as a **return type** signaling "this method might not produce a result" — not as a general-purpose substitute for `null` everywhere in a codebase.
+
+**⚠️ Keywords to nail:** `isPresent()`+`get()` is an anti-pattern — replace with `ifPresent(Consumer)`; `Optional.of(null)` throws NPE immediately (fail-fast assertion), `Optional.ofNullable(null)` returns `Optional.empty()` safely; `Optional` should never be a method parameter type or a JPA entity field type — it was designed specifically as a **return type**, and isn't even `Serializable`.
+
+---
+
+## Question 107 — `Thread` vs. `Runnable`, `join()`, and `StampedLock`
+
+**Ask:**
+1. Extending `Thread` vs. implementing `Runnable` — beyond "Java has single inheritance," what's the concrete design reason `Runnable` is preferred?
+2. `t1.join()` called from the main thread — exactly what does the calling thread do, and what happens if `t1` never terminates?
+3. What does `StampedLock` offer over `ReentrantReadWriteLock`, and name the concrete risk its optimistic-read mode introduces that the other lock types don't have.
+
+### Answer
+
+**Part 1 — the real design reason for `Runnable`:**
+- `Runnable` separates the **task** (what to run) from the **execution mechanism** (a `Thread`). A `Runnable` can be handed to an `ExecutorService`, run directly, or wrapped in a `FutureTask` — without being tied to `Thread`-specific machinery at all.
+- Extending `Thread` conflates "this is a unit of work" with "this is a thread" — the resulting class can't extend anything else, and the logic can't be reused outside the threading context (e.g., submitted to a thread pool instead of manually managed as a raw `Thread`).
+
+**Part 2 — exactly what `join()` does:**
+- The calling thread (main) **blocks and enters a `WAITING` state** until `t1` finishes execution — or until the optional timeout elapses, if `join(millis)` is used instead.
+- If `t1` never terminates (stuck in an infinite loop, deadlocked, etc.), the calling thread **waits forever** — plain `join()` has no built-in escape. This is a common source of application hangs when a spawned thread misbehaves and nobody calls the timed variant.
+
+**Part 3 — `StampedLock`'s advantage and its real risk:**
+- `StampedLock` adds a third mode beyond read/write: **optimistic read** — you obtain a "stamp" without acquiring any actual lock, do your read work assuming no writer interfered, then call `validate(stamp)` to check whether a writer actually modified data during that window; if invalid, you retry, usually falling back to a real read lock.
+- This avoids the read-lock overhead of `ReentrantReadWriteLock` in the common (no-writer-interference) case, giving noticeably better throughput under read-heavy, low-write-contention workloads.
+- **The concrete risk:** `StampedLock` is **not reentrant** — a thread that calls a `StampedLock`-guarded method recursively (or from within a callback triggered by that same call) can deadlock itself, unlike `ReentrantLock`/`ReentrantReadWriteLock`, which explicitly track ownership and let the same thread re-acquire without blocking.
+
+**⚠️ Keywords to nail:** `Runnable` decouples the task from the execution mechanism, letting it be reused with `ExecutorService`/`FutureTask` — extending `Thread` locks the class into being only a thread; `join()` puts the caller into `WAITING` with **no timeout by default** — an unterminated target thread hangs the caller forever; `StampedLock`'s optimistic-read mode skips locking entirely and validates afterward via `validate(stamp)`, but it is **not reentrant**, unlike `ReentrantReadWriteLock` — recursive/callback re-entry can deadlock.
+
+---
+
+## Question 108 — Executor Framework: `submit()` vs. `execute()` Exception Visibility
+
+**Code:**
+```java
+ExecutorService executor = Executors.newFixedThreadPool(4);
+executor.submit(() -> {
+    throw new RuntimeException("boom");
+});
+```
+
+**Ask:**
+1. This `RuntimeException` — where does it actually go? Does it crash the pool, get logged automatically, or something else entirely?
+2. `shutdown()` vs. `shutdownNow()` — exact difference in behavior toward already-queued and currently-running tasks.
+3. Trap: what's the actual difference between submitting a task via `execute()` vs. `submit()` in terms of exception visibility?
+
+### Answer
+
+**Part 1 — where the exception actually goes:**
+- It is **silently swallowed** — it does not crash the pool, does not print to console, and does not propagate anywhere by default when submitted via `submit()`.
+- It's captured inside the `Future` object that `submit()` returns; it only becomes visible when `future.get()` is called, which then re-throws it wrapped in an `ExecutionException`.
+- If `.get()` is never called on that `Future`, the exception is lost forever — a very common real bug source ("my background task failed and I never found out").
+
+**Part 2 — `shutdown()` vs. `shutdownNow()`:**
+- `shutdown()` — stops accepting new tasks, but lets **already-submitted tasks (queued and currently running) finish normally**: a graceful, non-disruptive shutdown.
+- `shutdownNow()` — stops accepting new tasks, **attempts to cancel currently-running tasks** via `Thread.interrupt()` (cooperative, not forceful — a task that ignores interruption keeps running regardless), and **returns the list of tasks that were still queued and never started**, so the caller can inspect or requeue them.
+
+**Part 3 — the real `execute()` vs. `submit()` difference:**
+- `execute()` (from the `Executor` interface, takes a `Runnable`, returns `void`) — if the task throws, the exception propagates to the pool's default `UncaughtExceptionHandler`, which typically prints a stack trace to stderr, so the failure is at least visible somewhere.
+- `submit()` (from `ExecutorService`, returns a `Future`) — as described above, the exception is captured inside the `Future` and stays completely invisible unless `.get()` is explicitly called.
+- This is a genuine, non-obvious behavioral difference between the two APIs — not just a signature/return-type difference — and it's a frequent cause of "failures that never surface" in production task-submission code.
+
+**⚠️ Keywords to nail:** `submit()` swallows exceptions inside the returned `Future` — visible only via `future.get()` (wrapped in `ExecutionException`), lost forever if `.get()` is never called; `shutdown()` lets in-flight and queued tasks finish; `shutdownNow()` interrupts running tasks (cooperative only) and returns the never-started queued tasks; `execute()` propagates uncaught exceptions to the pool's `UncaughtExceptionHandler` (visible on stderr) while `submit()` hides them — a real, commonly-missed behavioral gap between the two.
+
+---
+
+## Question 109 — Spring Data JPA: Repository Hierarchy, Derived Query Pitfalls, Pagination Count Query
+
+**Ask:**
+1. `CrudRepository`, `PagingAndSortingRepository`, and `JpaRepository` form a hierarchy — what does each actually add over the one below it, concretely (not just "more methods")?
+2. Derived query method `findByNameLike(String pattern)` — what exactly must the caller pass as `pattern`, and what's the common mistake?
+3. Trap: `@Query("SELECT c FROM Customer c WHERE c.age > :age")` combined with `Pageable` as a method parameter — does pagination actually work correctly out of the box here, or is something missing?
+
+### Answer
+
+**Part 1 — the concrete addition at each level:**
+- `CrudRepository<T, ID>` — basic CRUD only: `save()`, `findById()`, `findAll()`, `deleteById()`, `existsById()`, `count()`.
+- `PagingAndSortingRepository` extends it, adding `findAll(Pageable)` and `findAll(Sort)` — the concrete capability is fetching data in **chunks with an offset/limit and defined order**, rather than always loading the entire table, which matters once a table is too large to safely materialize with a plain `findAll()`.
+- `JpaRepository` extends `PagingAndSortingRepository` further, adding **JPA-specific batch operations**: `saveAll()`, `flush()` (forces pending changes to the DB immediately instead of waiting for transaction commit), and `deleteAllInBatch()`/`deleteInBatch()` (issues a single bulk `DELETE` statement instead of one per entity — matters for performance on large deletions).
+
+**Part 2 — the `findByNameLike` mistake:**
+- The caller must include the **SQL wildcard characters themselves** in the string passed — e.g., `findByNameLike("%John%")`, not `findByNameLike("John")`.
+- Spring Data does **not** automatically wrap the value in `%...%`. It translates directly to a `LIKE` clause using exactly whatever string is passed, so a bare `"John"` with no wildcards behaves like an exact match (`LIKE 'John'`) — the common mistake is expecting `Like` in the method name alone to imply a "contains" search.
+
+**Part 3 — the pagination + custom `@Query` trap:**
+- This **does work**, but only if a **count query** is also provided. Spring Data needs to know the total number of matching rows to populate `Page.getTotalElements()`/`getTotalPages()`, and it can't always safely auto-derive a count query from an arbitrary custom JPQL string, especially one involving joins.
+- Fix: `@Query(value = "SELECT c FROM Customer c WHERE c.age > :age", countQuery = "SELECT count(c) FROM Customer c WHERE c.age > :age")`.
+- Omitting `countQuery` on a non-trivial custom query is a common source of either a runtime exception or a silently incorrect total-page count.
+
+**⚠️ Keywords to nail:** `CrudRepository` = basic CRUD; `PagingAndSortingRepository` adds `findAll(Pageable)`/`findAll(Sort)` for chunked, ordered fetches; `JpaRepository` adds `saveAll()`, `flush()`, and batch delete operations; `findByXLike` requires the caller to supply `%...%` themselves — Spring Data does not auto-wrap wildcards; a custom `@Query` combined with `Pageable` needs an explicit `countQuery` for correct `Page` totals, since Spring Data can't safely auto-derive a count query from arbitrary JPQL.
+
+---
+
+
+
