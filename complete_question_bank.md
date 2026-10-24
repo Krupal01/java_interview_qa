@@ -7,6 +7,7 @@ Sources included:
 2. "Given this stack..." stack-based question set document
 3. The additional loose question list (JVM memory area ... managerial)
 4. The four screenshot-based coding questions
+5. Additional loose question list — Round 2 (DB migration ... org/dept/role/permission DB design)
 
 ---
 
@@ -623,3 +624,352 @@ stop.excalibur(excalibur);
 
 When doing so, you want to check for access to the lock without affecting the current thread execution. Which of the following alternatives can be utilized while doing so?
 
+
+---
+
+## Source 5: Additional Loose Question List — Round 2
+
+*Only questions that were **not** already present in Sources 1–4 are listed here. (The OOP/SOLID + Kotlin + Spring + Kafka + DB + Cloud + Security + Testing + System Design stack set, the "JVM memory area ... managerial" list, the Cursor/Trigger + polymorphism + SSL + EC2 + thread pool block, and the coding list were already captured above and are not repeated.)*
+
+### 5.1 — Database, Persistence & Migration
+
+* DB migration
+* Column validation changes in DB
+* Postgres and NoSQL DB
+* RDBMS
+* External SQL framework
+* How JPA works internally
+* Soft delete vs hard delete
+* DB locks, and too much DB operation in a single transaction — how do you handle that?
+* 2 services updating the same DB row — how do you handle it?
+* What is DB sharding?
+* How do you handle multiple databases in a single service?
+* Migrating an application to a new DB without downtime
+* How do you develop schema with the new and old way (backward-compatible schema evolution)?
+* Count(*) vs count(1) vs count(column)
+* Normalisation
+* How do you handle simultaneous DB calls on a single row in the trip table?
+* Should we keep rider/driver id directly in the trip table or make joins from trip to rider and driver tables — why use this relationship?
+* Lazy fetching vs eager fetching — which is the better approach?
+* Design a DB for org, department, user, role, permissions, and exceptional permissions
+* Aggregation stages in MongoDB
+* What if `@Transactional` is not working — what could be the reasons?
+* `@Transactional` on a private method
+* `@Transactional` internally — how does the proxy mechanism work?
+* What happens with a checked exception in a transaction — does it continue (safe) or roll back?
+* What exactly is the proxy in a transaction?
+* How transactions work, how can you create one yourself, and how does it roll back?
+* DB connection methods — save, commit, flush, etc.
+* How do you handle transactions in production?
+* JPA repository internals
+* How does Hibernate work — all the terms
+
+### 5.2 — Spring / Spring Boot Internals
+
+* CORS
+* TTL, cache key, cache vector — custom configuration
+* What happens if we override configuration?
+* What is a profile?
+* How do you activate a profile?
+* AOP — what is it and where/why do we use it, with a use case
+* Bean factory vs application context
+* Async in Spring
+* WebFlux
+* Why is field injection a bad injection style?
+* How do you optimize application startup time?
+* How do you change the server in Spring (external server instead of Tomcat)?
+* What is ResponseEntity?
+* What happens in the background when we start a Spring application?
+* Role of `SpringApplication.run()`
+* How does auto-configuration work internally, and how does it decide what to enable?
+* Actuators and how to change the actuator port
+* How do you manage service/management endpoints — what if we want to add new ones?
+* `@ControllerAdvice` exception checking
+* `@Data` — when is it safe and when not? How can it create bugs silently?
+* IoC storage and DI internal working
+* Bean init and working, scanning, injection
+* Spring Security layers and filters
+* Spring Boot application flow
+* How can we remove a cyclic dependency between services?
+* Spring Batch — why do we need it, and what is a pipeline?
+* I want to read a sheet with 2M rows and store it in MongoDB — how do you build that with Spring Batch?
+* Few RestTemplate methods used in a project — how does PATCH work with RestTemplate?
+* `@ConfigurationProperties`
+* Are `@Controller`, `@Service`, `@Repository` singleton by default?
+* Can we use `@Component` instead of `@Service` and `@Repository`?
+* Integration test vs unit test
+* What annotations do you use for testing, and how have you used Mockito?
+
+### 5.3 — Core Java, JVM & Memory
+
+* Load factor of a HashMap
+* Can a HashMap cause a memory leak?
+* When does volatile fail?
+* Reflection in Java
+* Comparator vs Comparable
+* Print to console without a main method
+* Can we have a static block — and what is a static block?
+* Can we have multiple finally blocks? If yes, which one runs?
+* What type of collection have you used in your project — give a real purpose for using it
+* Can we set a class object as a key in a HashMap?
+* Can a functional interface extend another interface?
+* How can we prevent singleton cloning?
+* Can we override the main method, or overload it?
+* Island of isolation
+* Why override finalize? Do we have finalize in a record class? Do record classes have methods?
+* How does cleanup work in GC?
+* Which thread performs GC? What is a daemon thread, and is it only for GC?
+* Marking, deletion and compaction
+* Generational GC strategy and how age is calculated
+* "Die young" hypothesis
+* Heap areas for GC — young generation, tenured, permanent generation
+* Eden space, survivor space
+* What is promotion?
+* Minor GC vs major GC
+* Why can't we use (volatile) on local variables and static fields?
+* Does overloading only work for objects?
+* Idempotent and safe operations
+* How do you make a class thread-safe and a collection thread-safe?
+* How does `new` work internally?
+* Role of the constructor
+* How is Java pass-by-value and not pass-by-reference?
+* Can a singleton instance be serialized? What is serialization, and how do you ensure it can be serialized?
+* Why does Java HashMap use a red-black tree? Why convert to a red-black tree, what is the time complexity, and why change from linked list to red-black tree?
+* Constructor in an abstract class — why do we have one even though we don't create objects of abstract classes? Can we make it private — what compilation issues arise?
+* Why are Strings considered good keys for a map?
+* Object class methods
+* Normal thread creation vs Executor class
+* Immutable class — name any immutable class
+* Custom immutable class
+* How to break a singleton
+* Hashmap vs LinkedHashMap vs Hashtable
+* Relation between hashCode() and equals()
+* Benefits of a marker interface
+* How does the compiler force a class to implement all methods of an interface?
+* How do overriding and overloading work internally? What is late (lazy) binding?
+* Class and interface relationship — Object, class, interface, abstract class hierarchy
+* Why `@Override` annotation — is it mandatory?
+* Constructor, init block — what happens when we put a return type in a constructor?
+* What is finalize in the Object class?
+* Parent-child relationship across classes, interfaces and abstract classes
+* Lower bound, upper bound, generics
+* Static keyword
+* Use of method area, native memory and PC registers
+* Access modifiers and their rules, hierarchy, parent-child rules
+* Exceptions and their rules — parent-child
+* Constructor rules — parent-child, instance block, static block
+* Streams internally
+* Why `@FunctionalInterface` annotation — is it mandatory?
+* Why can't a functional interface have more than one abstract method?
+* Pattern matching and method references — how do they work internally?
+* Switch statement internally
+* Record class — constructor, methods, static members; can it participate in inheritance?
+* Sealed class — with state, inheritance, static, singleton
+* Checked and unchecked exceptions at compile stage — how does the compiler check and force handling of checked exceptions?
+* Can we use abstract and final together on a class?
+* Why ConcurrentHashMap after Hashtable?
+* Second largest number in an array using Streams
+* Peek in Stream
+* Parallel stream vs sequential stream
+* Main usages of map vs flatMap
+* LinkedList, tree, graph — various algorithms and implementations
+* We can access a LinkedList by index, so why is an array faster than a LinkedList?
+* Can a constructor be final?
+* Assert property
+* `getNotify()` / `notify()` and `notifyAll()`
+* StringPool trick
+* Enum singleton
+* Why do we need a singleton, and what is not a singleton?
+* Static instance and constructor for a class
+* Instance block and other members — on a class vs on an interface, which is allowed where?
+
+### 5.4 — Concurrency, Threads & Virtual Threads
+
+* Lock striping and object pooling — how do they help us?
+* Sync vs asynchronous
+* Distributed locking
+* Real scenario where a deadlock happened in production for a banking system
+* How do you detect a deadlock in production?
+* Virtual thread limitations — how do you control them? What happens if we create too many virtual threads? There is no thread pool for virtual threads, so does it affect resources, memory, or anything else?
+* What happens if we create a separate virtual thread for each request?
+* Can virtual threads cause connection pool overload?
+* What is Project Loom?
+* CPU → OS thread → platform thread → virtual thread relationship
+* How do you handle ExecutorService and its parameters in a production system — how do you decide pool size?
+* What is a thread dump and a heap dump, and how do you monitor application health?
+* How do you find a blocked thread?
+* How does CompletableFuture work internally?
+* Why is Future blocking?
+* Before Java 8, how could we do parallel programming?
+* How do concurrent data structures work — ConcurrentHashMap, concurrent set, CopyOnWriteArrayList?
+* Collections internal working — map, set, list, ArrayList
+* How does a map know a key is unique? Same for set
+* How does ArrayList know it needs to increase its size — if we create an ArrayList with 2 elements vs 100 elements, at which point and how does it know to resize?
+* How does a thread pool work — what happens with no tasks and with too many tasks?
+* We don't have a thread pool for virtual threads, so how do we control virtual threads, and is there any option to reuse them?
+* How does CAS work for objects, how does volatile work for objects, and how do Atomic classes work?
+* How does synchronization work in Java?
+* Can 2 threads execute on the same object simultaneously — if there is no locking? If yes, how?
+* Counter in a synchronized method with multiple threads still producing wrong totals — what are the possible causes?
+* How to check thread dump and heap dump in production?
+* How to avoid deadlock
+
+### 5.5 — Microservices, Resilience & Communication
+
+* Circuit breaker and different patterns
+* How do you implement a timeout in a circuit breaker?
+* Custom settings for a circuit breaker — sliding window, threshold, timeout, wait duration, etc.
+* How do you implement a fallback mechanism in a circuit breaker, how does it work internally, and how does it trigger the fallback?
+* What if one service is slow in the circuit — how can we solve it when we are passing the result to another service?
+* If one microservice crashes, how do other services detect it?
+* What is latency in microservices and how do you handle it?
+* A service uploads a large file — how do you handle it?
+* ACL (anti-corruption layer) pattern
+* Sidecar pattern
+* Blue-green deployments
+* Scaling for high traffic
+* How do you handle a service that has trillions of requests of traffic?
+* How do you handle 100k requests per second?
+* If we have 50M requests per second, which part of the service should we focus on more — consistency handling, traffic handling, DB connection pool, locking, asynchronous processing, query issues?
+* Fault tolerance in microservices
+* How do you handle traffic?
+* Feign client vs REST client
+* How do you make sure all instances share the load evenly?
+* How do you decide the DB and strategy to use — separate DB for each microservice vs shared DB?
+* Distributed transactions and the SAGA pattern
+* How do you handle dependent microservices and their failure?
+* Why would we need to shift from microservices back to a monolith?
+* Convert a monolith to microservices
+* How does an API gateway know which APIs map to which service, and what other features do we use in the gateway?
+* BFF (backend for frontend) communication
+* Eventual consistency, fault tolerance, and fault tolerance with Kafka
+* Difficulties in microservices
+* Microservice design patterns
+* How do you decide the number of instances of a service?
+* Leader-follower pattern — why?
+* CQRS and its drawbacks — how would you achieve consistency, specially between read and write?
+* How did you implement SAGA — for choreography we have Kafka, so what do we use for orchestration?
+* Idempotency — what is it and how did you implement it in your project?
+* 2 APIs, one sending a proper response object and another sending direct text — what is the difference between the two?
+* HTTP status code 3xx — and can we add custom codes like 600–700?
+* Service protection from failure of another service — communication strategies
+
+### 5.6 — Security
+
+* How do you secure REST APIs?
+* How do you handle common vulnerabilities like SQL injection?
+* How do you handle service secrets and external configuration?
+* How do you handle all DB URLs and other configuration in a centralized way?
+* How do you handle security — microservice-to-microservice security (deep and clear answer)?
+* What type of data does a JWT hold — is a JWT encrypted or just encoded?
+* Other options instead of JWT, and why JWT?
+* What is TLS and SSL, and how do you implement it for API security in the first stage?
+* Complete authorization and authentication flow, with class- and method-level access
+* How do you provide security to a REST API — session management, JWT, certificates, roles? Complete implementation in steps (no code needed)
+* Security checks and additional security layers on top for a service
+* How do you store secure details in a DB, and how do you store username and password in a DB?
+* How does CSRF work in session-based APIs?
+
+### 5.7 — Kafka & Messaging
+
+* Kafka vs RabbitMQ
+* Where do you set topics, partitions and all other settings?
+* Kafka consumer side and producer side configuration
+* What are the bare-minimum configurations to write a Kafka consumer?
+* Consumer rebalancing
+* Consumer group vs consumer
+* 10 partitions and 20 consumers — what is the behavior?
+* Schema registry in Kafka — how do you handle versioning in Kafka?
+* Kafka Streams API
+* How do you publish from an application to a particular topic?
+* Republish a message to a Kafka topic
+* Is `send()` sync or asynchronous?
+* Where have you used sync and async communication — use cases
+* Report generation and report publishing — sync vs asynchronous tasking with Kafka events
+* How do you get a response back in Kafka, like payment → invoice → generate?
+
+### 5.8 — Performance, Caching & Production Issues
+
+* Cache
+* How do you handle cache with time-based update and forced update?
+* How does caching work internally?
+* Memory optimization because the service runs out of memory
+* How do you optimize JVM startup time?
+* How do you optimize your code?
+* How do you check for crashes and failures?
+* Application is slower in production compared to dev — what could be the issue?
+* What if `@Service` is put on a repository class and `@Repository` on a service class?
+* APIs work fine in Postman but not from the site for the frontend developer — what would be the issue?
+* API is suddenly slow — what will you check first and how do you handle it?
+* Production issue at midnight — how do you handle and investigate it?
+* DB CPU is low but API latency is high — what could be the reason?
+* A critical service goes down during business hours — what steps do you take?
+* One production issue and how you fixed it, and the most difficult bug you solved
+* How did you debug an OutOfMemoryError and how did you solve it?
+* Heap dump analysis
+* Deadlock example and how to fix it
+* How to optimize a SQL query
+* SQL EXPLAIN, joins and indexing to optimize
+* HAVING vs WHERE in SQL
+* Different joins in SQL
+* How do you decide DB indexing, composite index, order of indexing — can two indexes be used at a time or only one?
+* How do you optimize queries, DB projection, polling — how do you find which query is slow?
+* Performance testing
+* Logging, alerting, production failure and monitoring
+* ELK implementation
+* What is Splunk, how do you use it and why?
+* What does Sonar check in your project and how did you use it?
+
+### 5.9 — Cloud, DevOps & CI/CD
+
+* Kubernetes and Jenkins for deployment
+* Virtual machine vs Docker
+* Why is Docker used?
+* How does Docker help run a container on all types of machines — how does it work?
+* How do you manage all containers of multiple services, and the commands?
+* What is Kubernetes and what are its commands?
+* Where are Docker images stored — versioning and ECS
+* Docker image versioning
+* How do you create a Docker image?
+* Docker volume
+* Kubernetes ConfigMap
+* Helm charts in Kubernetes
+* How do you increase instances in Kubernetes — by script and by CLI?
+* How have you used Kubernetes in your current project?
+* Steps for CI/CD
+* CI/CD tools used in your project
+* How do you follow different modules in the pipeline — explain the complete flow of your pipeline
+* Different deployment strategies — blue-green, canary, etc.
+* Which AWS service can we use to deploy?
+* How can we use Docker for deployment?
+* How can we manage environments, secrets and load balancers?
+* How do you manage common properties and secrets?
+* How do you trigger and develop a Lambda?
+* Lambda service — how is it serverless, triggering, EC2, SQS, SNS, and 2–3 ways to deploy
+* What is Terraform and how have you used it?
+* Basic commands for Terraform
+* IaC — infrastructure as code
+* Automation testing
+* Merge vs rebase — how do you resolve conflicts?
+* Challenges in migrating to a new Spring and Java version
+* Whole process for the current project and previous projects
+
+### 5.10 — Design, Architecture & Scenario Design
+
+* Design patterns — why used and why important? Which pattern solves which problem?
+* Why and which design pattern did you use?
+* How do you implement SOLID?
+* IoC and DI relationship
+* REST vs SOAP
+* What is gRPC?
+* How do we validate a request body across multiple URL versions?
+* Can we do overloading in a controller to support versioning and backward compatibility for a large user base?
+* v2 makes one extra DB call but v1 does not — how do we handle this for backward compatibility?
+* We have a ride booking application with millions of riders — how can we find the nearest riders from a pickup location (with JPA and SQL)?
+* We have a large-scale application that needs some real-time data in multiple regions — how can we manage it in a timely manner across regions?
+* UTC concept in a large-scale multi-region application — how do we use LocalTime, and how does LocalTime work for India and America at the same time?
+* We have an offer table that stores promo codes — how many fields would you add, and how do we enable a code only for a particular day or the first week of every month? Is storing all promo codes in the DB a good approach, or is there an alternative?
+* How do you track a driver and a trip — should we store everything in the DB? For a large application that would be too many DB queries
+* If 2 people at the same cafe book a ride and both get the same rider on the first attempt, will it book the same rider for two trips — how do you handle it?
+* How do you notify the frontend that a task is complete?
+* How do we handle reverting an operation or transaction on failure of another service?
